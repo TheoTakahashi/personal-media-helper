@@ -1,0 +1,176 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 370px;
+  min-height: 420px;
+  margin: 0;
+  background: #f7f8fa;
+  color: #19212b;
+  font: 13px/1.45 "Segoe UI", "Malgun Gothic", sans-serif;
+}
+
+main {
+  padding: 18px;
+}
+
+header,
+.section-title,
+.toolbar,
+.media-card,
+.media-actions {
+  display: flex;
+  align-items: center;
+}
+
+header {
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  background: #246bfd;
+  color: white;
+  font-size: 17px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+header p,
+.permission-state,
+footer {
+  color: #697586;
+  font-size: 11px;
+}
+
+.toolbar {
+  justify-content: space-between;
+  gap: 8px;
+  padding: 11px 0;
+  border-top: 1px solid #e5e8ee;
+  border-bottom: 1px solid #e5e8ee;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.secondary {
+  padding: 8px 10px;
+  background: #e9efff;
+  color: #1957d2;
+  font-weight: 600;
+}
+
+.section-title {
+  justify-content: space-between;
+  margin: 17px 0 9px;
+}
+
+h2 {
+  font-size: 13px;
+}
+
+.count {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 12px;
+  background: #e9edf3;
+  color: #586474;
+  text-align: center;
+  font-size: 11px;
+}
+
+.media-list {
+  display: grid;
+  gap: 8px;
+  max-height: 310px;
+  overflow: auto;
+}
+
+.media-card {
+  display: block;
+  padding: 11px;
+  border: 1px solid #e5e8ee;
+  border-radius: 10px;
+  background: white;
+}
+
+.media-name {
+  overflow: hidden;
+  color: #263142;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-meta,
+.media-url {
+  margin-top: 3px;
+  color: #778293;
+  font-size: 10px;
+}
+
+.media-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-actions {
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.download-button {
+  padding: 7px 11px;
+  background: #246bfd;
+  color: white;
+  font-weight: 600;
+}
+
+.empty-state {
+  padding: 30px 16px;
+  color: #7b8795;
+  text-align: center;
+}
+
+.status {
+  min-height: 20px;
+  margin-top: 8px;
+  color: #1957d2;
+  font-size: 11px;
+}
+
+.status.error {
+  color: #b42318;
+}
+
+footer {
+  padding-top: 10px;
+  border-top: 1px solid #e5e8ee;
+}

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Personal Media Saver",
+  "version": "0.1.0",
+  "description": "현재 페이지에서 미디어를 찾아 개인용으로 저장합니다.",
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "scripting",
+    "storage"
+  ],
+  "optional_permissions": [
+    "webRequest"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Personal Media Saver",
+    "default_popup": "popup.html"
+  }
+}

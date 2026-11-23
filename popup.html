@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Personal Media Saver</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand-mark" aria-hidden="true">▶</div>
+        <div>
+          <h1>Media Saver</h1>
+          <p id="page-name">현재 페이지의 미디어를 찾는 중</p>
+        </div>
+      </header>
+
+      <section class="toolbar" aria-label="페이지 탐지 설정">
+        <button id="monitor-button" class="secondary" type="button">이 사이트에서 계속 찾기</button>
+        <span id="permission-state" class="permission-state">현재 페이지 한 번만 확인합니다</span>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <h2>찾은 미디어</h2>
+          <span id="media-count" class="count">0</span>
+        </div>
+        <div id="media-list" class="media-list" aria-live="polite"></div>
+        <p id="empty-state" class="empty-state">페이지에서 미디어를 찾지 못했습니다. 재생을 시작한 뒤 새로고침해 보세요.</p>
+      </section>
+
+      <p id="status" class="status" role="status"></p>
+      <footer>접근 권한은 사이트별로 묻고, 탐지 목록은 이 기기에만 저장합니다.</footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
