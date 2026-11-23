@@ -123,7 +123,14 @@ let jobWrites = Promise.resolve();
 let creatingOffscreen = null;
 
 async function startHlsJob({ url, name }) {
-  const job = { id: crypto.randomUUID(), url, name, state: "queued", message: "저장을 준비하고 있습니다." };
+  const job = {
+    id: crypto.randomUUID(),
+    url,
+    name,
+    state: "queued",
+    message: "저장을 준비하고 있습니다.",
+    createdAt: Date.now()
+  };
   await updateJob(job.id, job);
   await ensureOffscreen();
   await chrome.runtime.sendMessage({ target: "offscreen", type: "run-hls", job });

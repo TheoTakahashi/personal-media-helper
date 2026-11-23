@@ -69,9 +69,16 @@ async function buildHls(job) {
     }
     parts.push(...downloaded);
     const done = Math.min(index + batch.length, resources.length);
-    await report(job.id, { state: "running", message: `미디어 조각 ${done}/${resources.length} 저장 중` });
+    await report(job.id, {
+      state: "running",
+      message: "미디어 조각을 받는 중",
+      done,
+      total: resources.length,
+      bytes: totalBytes
+    });
   }
 
+  await report(job.id, { state: "running", message: "파일로 합치는 중" });
   const extension = parsed.init ? "mp4" : "ts";
   const blob = new Blob(parts, { type: parsed.init ? "video/mp4" : "video/mp2t" });
   return {

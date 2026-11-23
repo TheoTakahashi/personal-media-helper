@@ -153,6 +153,78 @@ h2 {
   font-weight: 600;
 }
 
+.job-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.job-card {
+  padding: 9px 11px;
+  border: 1px solid #e5e8ee;
+  border-radius: 10px;
+  background: white;
+}
+
+.job-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.job-name {
+  overflow: hidden;
+  color: #263142;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-percent {
+  flex: none;
+  color: #1957d2;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.job-bar {
+  height: 5px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #e9edf3;
+}
+
+.job-bar-fill {
+  height: 100%;
+  background: #246bfd;
+  transition: width 0.2s;
+}
+
+.job-detail {
+  margin-top: 4px;
+  color: #778293;
+  font-size: 10px;
+}
+
+.job-card.done .job-bar-fill {
+  background: #12a150;
+}
+
+.job-card.done .job-percent {
+  color: #12a150;
+}
+
+.job-card.error .job-bar-fill {
+  background: #d92d20;
+}
+
+.job-card.error .job-percent,
+.job-card.error .job-detail {
+  color: #b42318;
+}
+
 .empty-state {
   padding: 30px 16px;
   color: #7b8795;

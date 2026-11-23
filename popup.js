@@ -15,12 +15,12 @@ chrome.storage.session.onChanged.addListener((changes) => {
   if (!changes.hlsJobs) return;
   jobs = changes.hlsJobs.newValue ?? {};
   renderEntries();
-  showLatestJob();
+  renderJobs();
 });
 
 async function initialize() {
   ({ hlsJobs: jobs = {} } = await chrome.storage.session.get("hlsJobs"));
-  showLatestJob();
+  renderJobs();
 
   [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!activeTab?.id || !activeTab.url?.startsWith("http")) {
@@ -152,12 +152,61 @@ async function startHls(entry) {
 }
 
 function isJobRunning(url) {
-  return Object.values(jobs).some((job) => job.url === url && job.state !== "done" && job.state !== "error");
+  return Object.values(jobs).some((job) => job.url === url && !isFinishedJob(job));
 }
 
-function showLatestJob() {
-  const latest = Object.values(jobs).sort((a, b) => b.updatedAt - a.updatedAt)[0];
-  if (latest) showStatus(latest.message, latest.state === "error");
+function renderJobs() {
+  const sorted = Object.values(jobs).sort((a, b) =>
+    Number(isFinishedJob(a)) - Number(isFinishedJob(b)) || (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  const running = sorted.filter((job) => !isFinishedJob(job)).length;
+
+  document.querySelector("#job-section").hidden = sorted.length === 0;
+  document.querySelector("#job-count").textContent = running > 0 ? `${running}개 진행 중` : String(sorted.length);
+
+  const jobList = document.querySelector("#job-list");
+  jobList.replaceChildren(...sorted.map(createJobCard));
+}
+
+function createJobCard(job) {
+  const percent = job.state === "done" ? 100 : job.total ? Math.floor((job.done / job.total) * 100) : 0;
+
+  const card = document.createElement("article");
+  card.className = `job-card ${job.state}`;
+
+  const head = document.createElement("div");
+  head.className = "job-head";
+  const name = document.createElement("div");
+  name.className = "job-name";
+  name.textContent = job.name || fileNameFromUrl(job.url) || "미디어";
+  name.title = job.url;
+  const percentLabel = document.createElement("span");
+  percentLabel.className = "job-percent";
+  percentLabel.textContent = job.state === "error" ? "실패" : job.state === "done" ? "완료" : `${percent}%`;
+  head.append(name, percentLabel);
+
+  const bar = document.createElement("div");
+  bar.className = "job-bar";
+  const fill = document.createElement("div");
+  fill.className = "job-bar-fill";
+  fill.style.width = `${job.state === "error" ? 100 : percent}%`;
+  bar.append(fill);
+
+  const detail = document.createElement("div");
+  detail.className = "job-detail";
+  const counts = job.total && job.state === "running" ? ` · 조각 ${job.done}/${job.total} · ${formatBytes(job.bytes)}` : "";
+  detail.textContent = `${job.message}${counts}`;
+
+  card.append(head, bar, detail);
+  return card;
+}
+
+function isFinishedJob(job) {
+  return job.state === "done" || job.state === "error";
+}
+
+function formatBytes(bytes = 0) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
 function isHls(entry) {
