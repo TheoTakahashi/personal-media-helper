@@ -1,4 +1,6 @@
 const objectUrls = new Map();
+const tempFiles = new Map();
+const tempDirReady = clearTempDir();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.target !== "offscreen") return false;
@@ -9,6 +11,7 @@ chrome.runtime.onMessage.addListener((message) => {
     const objectUrl = objectUrls.get(message.jobId);
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrls.delete(message.jobId);
+    void removeTempFile(message.jobId);
   }
   return false;
 });
@@ -23,6 +26,7 @@ async function runHls(job) {
     objectUrls.set(job.id, objectUrl);
     await chrome.runtime.sendMessage({ target: "background", type: "hls-ready", jobId: job.id, objectUrl, filename });
   } catch (error) {
+    await removeTempFile(job.id);
     await report(job.id, { state: "error", message: error.message || "다운로드에 실패했습니다." });
   }
 }
@@ -51,40 +55,69 @@ async function buildHls(job) {
 
   const parsed = parseMediaPlaylist(playlist, finalUrl);
   if (parsed.segments.length === 0) throw new Error("재생목록에 저장할 미디어 조각이 없습니다.");
-  if (parsed.segments.length > 1000) throw new Error("재생목록이 너무 깁니다. 1,000개 이하의 조각만 저장할 수 있습니다.");
 
   const resources = [...(parsed.init ? [parsed.init] : []), ...parsed.segments];
   if (resources.some((resource) => new URL(resource).origin !== playlistUrl.origin)) {
     throw new Error("미디어 조각이 재생목록과 다른 도메인에 있어 이 버전에서는 저장하지 않습니다.");
   }
 
-  const parts = [];
+  const extension = parsed.init ? "mp4" : "ts";
+  const writable = await createTempFile(job.id);
   let totalBytes = 0;
-  for (let index = 0; index < resources.length; index += 4) {
-    const batch = resources.slice(index, index + 4);
-    const downloaded = await Promise.all(batch.map(fetchBytes));
-    totalBytes += downloaded.reduce((sum, part) => sum + part.size, 0);
-    if (totalBytes > 512 * 1024 * 1024) {
-      throw new Error("저장할 미디어가 512MB를 넘어 이 버전의 메모리 한도를 초과합니다.");
+  try {
+    for (let index = 0; index < resources.length; index += 4) {
+      const batch = resources.slice(index, index + 4);
+      const downloaded = await Promise.all(batch.map(fetchBytes));
+      for (const part of downloaded) {
+        await writable.write(part);
+        totalBytes += part.size;
+      }
+      const done = Math.min(index + batch.length, resources.length);
+      await report(job.id, {
+        state: "running",
+        message: "미디어 조각을 받는 중",
+        done,
+        total: resources.length,
+        bytes: totalBytes
+      });
     }
-    parts.push(...downloaded);
-    const done = Math.min(index + batch.length, resources.length);
-    await report(job.id, {
-      state: "running",
-      message: "미디어 조각을 받는 중",
-      done,
-      total: resources.length,
-      bytes: totalBytes
-    });
+    await report(job.id, { state: "running", message: "파일로 합치는 중" });
+    await writable.close();
+  } catch (error) {
+    await writable.abort().catch(() => {});
+    throw error;
   }
 
-  await report(job.id, { state: "running", message: "파일로 합치는 중" });
-  const extension = parsed.init ? "mp4" : "ts";
-  const blob = new Blob(parts, { type: parsed.init ? "video/mp4" : "video/mp2t" });
+  const file = await tempFiles.get(job.id).getFile();
   return {
-    objectUrl: URL.createObjectURL(blob),
+    objectUrl: URL.createObjectURL(file),
     filename: `${sanitizeFilename(baseName(job.name || fileNameFromUrl(job.url) || "media"))}.${extension}`
   };
+}
+
+async function getTempDir() {
+  const root = await navigator.storage.getDirectory();
+  return root.getDirectoryHandle("hls", { create: true });
+}
+
+async function clearTempDir() {
+  const root = await navigator.storage.getDirectory();
+  await root.removeEntry("hls", { recursive: true }).catch(() => {});
+}
+
+async function createTempFile(jobId) {
+  await tempDirReady;
+  const dir = await getTempDir();
+  const handle = await dir.getFileHandle(jobId, { create: true });
+  tempFiles.set(jobId, handle);
+  return handle.createWritable();
+}
+
+async function removeTempFile(jobId) {
+  if (!tempFiles.has(jobId)) return;
+  tempFiles.delete(jobId);
+  const dir = await getTempDir();
+  await dir.removeEntry(jobId).catch(() => {});
 }
 
 async function fetchText(url) {
