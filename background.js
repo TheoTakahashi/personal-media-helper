@@ -1,4 +1,6 @@
-const listenersByOrigin = new Map();
+const MONITOR_PATTERNS = ["http://*/*", "https://*/*"];
+let monitoring = false;
+let candidateWrites = Promise.resolve();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "enable-origin") {
@@ -51,34 +53,13 @@ function candidateKey(tabId) {
 
 async function restoreOrigins() {
   const { monitoredOrigins = [] } = await chrome.storage.local.get("monitoredOrigins");
-  for (const origin of monitoredOrigins) {
-    try {
-      await registerOrigin(origin);
-    } catch {
-      // 사용자가 권한을 거둔 사이트는 다시 요청을 받기 전까지 건너뜁니다.
-    }
-  }
+  if (monitoredOrigins.length > 0 && await hasMonitorPermission()) startMonitoring();
 }
 
 async function registerOrigin(origin) {
   const parsedOrigin = new URL(origin).origin;
-  if (listenersByOrigin.has(parsedOrigin)) return;
-
-  const granted = await chrome.permissions.contains({
-    permissions: ["webRequest"],
-    origins: [`${parsedOrigin}/*`]
-  });
-  if (!granted) throw new Error("이 사이트의 요청 탐지 권한이 없습니다.");
-
-  const listener = (details) => {
-    void saveCandidate(details, parsedOrigin);
-  };
-  chrome.webRequest.onCompleted.addListener(
-    listener,
-    { urls: [`${parsedOrigin}/*`] },
-    ["responseHeaders"]
-  );
-  listenersByOrigin.set(parsedOrigin, listener);
+  if (!await hasMonitorPermission()) throw new Error("미디어 요청을 탐지할 권한이 없습니다.");
+  startMonitoring();
 
   const { monitoredOrigins = [] } = await chrome.storage.local.get("monitoredOrigins");
   if (!monitoredOrigins.includes(parsedOrigin)) {
@@ -86,33 +67,72 @@ async function registerOrigin(origin) {
   }
 }
 
-async function saveCandidate(details, monitoredOrigin) {
+function hasMonitorPermission() {
+  return chrome.permissions.contains({ permissions: ["webRequest"], origins: MONITOR_PATTERNS });
+}
+
+function startMonitoring() {
+  if (monitoring) return;
+  chrome.webRequest.onCompleted.addListener(
+    (details) => void saveCandidate(details),
+    { urls: MONITOR_PATTERNS },
+    ["responseHeaders"]
+  );
+  monitoring = true;
+}
+
+async function saveCandidate(details) {
   if (details.tabId < 0 || !isMediaRequest(details)) return;
 
-  const key = candidateKey(details.tabId);
-  const stored = await chrome.storage.local.get(key);
-  const previous = stored[key] ?? [];
+  const tab = await chrome.tabs.get(details.tabId).catch(() => null);
+  const pageOrigin = originOf(tab?.url);
+  const { monitoredOrigins = [] } = await chrome.storage.local.get("monitoredOrigins");
+  if (!pageOrigin || !monitoredOrigins.includes(pageOrigin)) return;
+
   const candidate = {
     url: details.url,
-    pageUrl: details.documentUrl ?? details.initiator ?? monitoredOrigin,
+    name: tab.title,
+    pageUrl: tab.url,
     mimeType: getHeader(details.responseHeaders, "content-type"),
     disposition: getHeader(details.responseHeaders, "content-disposition"),
     resourceType: details.type,
     seenAt: Date.now()
   };
-  const retained = previous.filter((item) => item.url !== candidate.url && Date.now() - item.seenAt < 30 * 60 * 1000);
-  await chrome.storage.local.set({ [key]: [candidate, ...retained].slice(0, 80) });
+
+  const key = candidateKey(details.tabId);
+  candidateWrites = candidateWrites.then(async () => {
+    const stored = await chrome.storage.local.get(key);
+    const previous = stored[key] ?? [];
+    const retained = previous.filter((item) => item.url !== candidate.url && Date.now() - item.seenAt < 30 * 60 * 1000);
+    await chrome.storage.local.set({ [key]: [candidate, ...retained].slice(0, 80) });
+  }).catch(() => {});
+  await candidateWrites;
+}
+
+function originOf(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "";
+  }
 }
 
 function isMediaRequest(details) {
   const mimeType = getHeader(details.responseHeaders, "content-type").toLowerCase();
   const url = details.url.toLowerCase();
+  if (isSegmentRequest(url, mimeType)) return false;
   return details.type === "media"
     || mimeType.startsWith("video/")
     || mimeType.startsWith("audio/")
     || mimeType.includes("mpegurl")
     || mimeType.includes("dash+xml")
     || /\.(mp4|m4v|mov|webm|mkv|mp3|m4a|aac|ogg|opus|m3u8|mpd)(?:[?#]|$)/i.test(url);
+}
+
+function isSegmentRequest(url, mimeType) {
+  return mimeType.includes("mp2t")
+    || mimeType.includes("iso.segment")
+    || /\.(ts|m4s|m4f|cmfv|cmfa)(?:[?#]|$)/i.test(url);
 }
 
 function getHeader(headers = [], targetName) {
@@ -176,7 +196,7 @@ function updateJob(jobId, patch) {
     }
     jobs[jobId] = { ...jobs[jobId], ...patch, updatedAt: now };
     await chrome.storage.session.set({ hlsJobs: jobs });
-  });
+  }).catch(() => {});
   return jobWrites;
 }
 

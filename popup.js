@@ -35,22 +35,28 @@ async function initialize() {
 
 async function refreshMedia() {
   try {
-    const [pageResult, storedResult] = await Promise.all([
-      chrome.scripting.executeScript({ target: { tabId: activeTab.id }, func: scanCurrentPage }),
+    const [pageResults, storedResult] = await Promise.all([
+      scanAllFrames(),
       chrome.runtime.sendMessage({ type: "get-candidates", tabId: activeTab.id })
     ]);
-    entries = mergeEntries(pageResult[0]?.result ?? [], storedResult?.candidates ?? []);
+    const pageEntries = pageResults.flatMap((result) => result.result ?? []);
+    entries = mergeEntries(pageEntries, storedResult?.candidates ?? []);
     renderEntries();
   } catch (error) {
     showStatus(`페이지를 읽지 못했습니다: ${error.message}`, true);
   }
 }
 
+function scanAllFrames() {
+  return chrome.scripting.executeScript({ target: { tabId: activeTab.id, allFrames: true }, func: scanCurrentPage })
+    .catch(() => chrome.scripting.executeScript({ target: { tabId: activeTab.id }, func: scanCurrentPage }));
+}
+
 async function enableMonitoring() {
   const origin = new URL(activeTab.url).origin;
   const granted = await chrome.permissions.request({
     permissions: ["webRequest"],
-    origins: [`${origin}/*`]
+    origins: ["http://*/*", "https://*/*"]
   });
   if (!granted) {
     showStatus("권한을 허용하지 않아 페이지의 현재 미디어만 확인합니다.");

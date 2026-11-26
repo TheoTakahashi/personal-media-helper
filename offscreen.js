@@ -46,9 +46,6 @@ async function buildHls(job) {
     if (variant.separateAudio) {
       throw new Error("별도 오디오 트랙이 있는 HLS는 아직 지원하지 않습니다.");
     }
-    if (new URL(variant.url).origin !== playlistUrl.origin) {
-      throw new Error("다른 도메인의 HLS 변형은 별도 권한을 요청해야 합니다.");
-    }
     finalUrl = variant.url;
     playlist = await fetchText(finalUrl);
   }
@@ -57,9 +54,6 @@ async function buildHls(job) {
   if (parsed.segments.length === 0) throw new Error("재생목록에 저장할 미디어 조각이 없습니다.");
 
   const resources = [...(parsed.init ? [parsed.init] : []), ...parsed.segments];
-  if (resources.some((resource) => new URL(resource).origin !== playlistUrl.origin)) {
-    throw new Error("미디어 조각이 재생목록과 다른 도메인에 있어 이 버전에서는 저장하지 않습니다.");
-  }
 
   const extension = parsed.init ? "mp4" : "ts";
   const writable = await createTempFile(job.id);
@@ -121,15 +115,23 @@ async function removeTempFile(jobId) {
 }
 
 async function fetchText(url) {
-  const response = await fetch(url, { credentials: "include", cache: "no-store" });
+  const response = await fetchWithHint(url, "재생목록");
   if (!response.ok) throw new Error(`재생목록 응답 오류: HTTP ${response.status}`);
   return response.text();
 }
 
 async function fetchBytes(url) {
-  const response = await fetch(url, { credentials: "include", cache: "no-store" });
+  const response = await fetchWithHint(url, "미디어 조각");
   if (!response.ok) throw new Error(`미디어 조각 응답 오류: HTTP ${response.status}`);
   return response.blob();
+}
+
+async function fetchWithHint(url, label) {
+  try {
+    return await fetch(url, { credentials: "include", cache: "no-store" });
+  } catch {
+    throw new Error(`${label}을(를) 받지 못했습니다(${new URL(url).hostname}). 다른 도메인이라면 '이 사이트에서 계속 찾기'로 권한을 허용한 뒤 다시 시도하세요.`);
+  }
 }
 
 function chooseVariant(playlist, baseUrl) {
